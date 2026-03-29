@@ -1,67 +1,46 @@
 import streamlit as st
+from PIL import Image
+import random
 
-# 페이지 설정
 st.set_page_config(page_title="Character Confusion Demo", layout="centered")
 
-# 제목
 st.title("Handwritten Character Confusion Detection")
-st.caption("Input target character → confusion probability → gap → threshold highlight")
+st.caption("Upload image → prediction → gap → threshold highlight")
 
-# 1. 대상 문자 입력
-st.markdown("### 1. Enter Target Character")
-target_char = st.text_input(
-    "Enter a target character (example: 2, 1, 0)",
-    key="input_char"
+def fake_model_prediction():
+    classes = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+    probs = [random.random() for _ in classes]
+    total = sum(probs)
+    probs = [p / total for p in probs]
+    return dict(zip(classes, probs))
+
+uploaded_file = st.file_uploader(
+    "Upload a handwritten image",
+    type=["png", "jpg", "jpeg"]
 )
 
-# 2. threshold 설정
-st.markdown("### 2. Set Threshold")
-threshold = st.slider("Set threshold", 0.0, 1.0, 0.20, 0.01)
+if uploaded_file is not None:
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Uploaded Image", width=250)
+    st.write(f"Image size: {image.size}")
 
-# 입력이 있을 때만 실행
-if target_char:
-    target_char = target_char.strip()
+    prediction = fake_model_prediction()
+    sorted_pred = sorted(prediction.items(), key=lambda x: x[1], reverse=True)
 
-    st.write(f"Input character: **{target_char}**")
-    st.write("The system calculates possible confusion pair probabilities for the input character.")
+    top1 = sorted_pred[0]
+    top2 = sorted_pred[1]
+    gap = top1[1] - top2[1]
 
-    # 3. 혼동쌍 확률 계산 (simulation)
-    if target_char == "2":
-        label1, prob1 = "2", 0.55
-        label2, prob2 = "z", 0.45
-    elif target_char == "1":
-        label1, prob1 = "1", 0.52
-        label2, prob2 = "l", 0.48
-    elif target_char == "0":
-        label1, prob1 = "0", 0.60
-        label2, prob2 = "o", 0.40
-    else:
-        label1, prob1 = target_char, 0.90
-        label2, prob2 = "unknown", 0.10
+    st.markdown("### Prediction Result")
+    st.write(f"Top 1: {top1[0]} ({top1[1]:.2f})")
+    st.write(f"Top 2: {top2[0]} ({top2[1]:.2f})")
+    st.write(f"Gap: {gap:.2f}")
 
-    # 4. gap 계산
-    gap = prob1 - prob2
+    threshold = st.slider("Set threshold", 0.0, 1.0, 0.20, 0.01)
 
-    st.markdown("### 3. Confusion Pair Probabilities")
-    st.write(f"Top 1: **{label1} ({prob1:.2f})**")
-    st.write(f"Top 2: **{label2} ({prob2:.2f})**")
-
-    st.markdown("### 4. Gap Calculation")
-    st.write(f"Gap = **{gap:.2f}**")
-    st.progress(prob1)
-
-if gap < threshold:
-    st.write("⚠️ The probabilities are too close → high confusion risk")
-else:
-    st.write("✅ The probabilities are clearly separated → low confusion risk")
-
-    # 5. threshold 기반 하이라이트
-    st.markdown("### 5. Threshold-based Highlight")
     if gap < threshold:
-        st.warning(f"⚠️ Potential confusion detected: {label1} ↔ {label2}")
+        st.warning(f"Potential confusion detected: {top1[0]} ↔ {top2[0]}")
     else:
-        st.success(f"✅ Clear prediction: {label1}")
-
+        st.success(f"Clear prediction: {top1[0]}")
 else:
-    st.info("Please enter a target character.")
-
+    st.info("Please upload an image.")
