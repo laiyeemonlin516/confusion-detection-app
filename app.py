@@ -1,21 +1,29 @@
 import streamlit as st
-from PIL import Image
+from PIL import Image, ImageDraw
 import pytesseract
 
 st.set_page_config(page_title="Handwritten Character Confusion Detection", layout="centered")
 
 st.title("Handwritten Character Confusion Detection")
-st.caption("Upload handwritten image → OCR → character analysis → confusion detection")
+st.caption("Upload image → OCR → detect confusing characters → highlight on image")
 
-# Tesseract path for your Mac
+# Tesseract path
 pytesseract.pytesseract.tesseract_cmd = "/opt/homebrew/bin/tesseract"
 
-# Confusion pairs
-confusion_pairs = {
-    "5": ["S", "s"],
-    "2": ["Z", "z"],
+# confusion characters
+confusion_map = {
+    "0": ["O", "o"],
+    "O": ["0"],
+    "o": ["0"],
     "1": ["I", "l"],
-    "0": ["O", "o"]
+    "I": ["1", "l"],
+    "l": ["1", "I"],
+    "2": ["Z", "z"],
+    "Z": ["2"],
+    "z": ["2"],
+    "5": ["S", "s"],
+    "S": ["5"],
+    "s": ["5"]
 }
 
 uploaded_file = st.file_uploader(
@@ -24,57 +32,77 @@ uploaded_file = st.file_uploader(
 )
 
 if uploaded_file is not None:
-    image = Image.open(uploaded_file)
+    image = Image.open(uploaded_file).convert("RGB")
+    st.markdown("### Original Image")
+    st.image(image, caption="Uploaded Image", width=350)
 
-    st.image(image, caption="Uploaded Image", width=300)
-    st.write(f"Image size: {image.size}")
-
-    # OCR
-    text = pytesseract.image_to_string(image)
+    # OCR text
+    extracted_text = pytesseract.image_to_string(image)
 
     st.markdown("### OCR Extracted Text")
-    if text.strip():
-        st.text(text)
+    if extracted_text.strip():
+        st.text(extracted_text)
     else:
         st.warning("No text was extracted from the image.")
 
-    # Character analysis
-    chars = list(text.replace(" ", "").replace("\n", ""))
+    # OCR data with boxes
+    data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
 
-    st.markdown("### Character Analysis")
-    if chars:
-        st.write(chars)
+    draw = ImageDraw.Draw(image)
+    found_items = []
+
+    n = len(data["text"])
+
+    for i in range(n):
+        word = data["text"][i].strip()
+
+        if not word:
+            continue
+
+        # confidence check
+        conf_value = data["conf"][i]
+        try:
+            conf_value = float(conf_value)
+        except:
+            conf_value = -1
+
+        # check if word contains confusing character
+        suspicious_chars = []
+        for ch in word:
+            if ch in confusion_map:
+                suspicious_chars.append(ch)
+
+        if suspicious_chars:
+            x = data["left"][i]
+            y = data["top"][i]
+            w = data["width"][i]
+            h = data["height"][i]
+
+            # draw rectangle
+            draw.rectangle([x, y, x + w, y + h], outline="red", width=3)
+
+            found_items.append({
+                "word": word,
+                "chars": suspicious_chars,
+                "conf": conf_value,
+                "box": (x, y, w, h)
+            })
+
+    st.markdown("### Highlighted Result")
+    st.image(image, caption="Highlighted Image", width=350)
+
+    st.markdown("### Confusion Detection Report")
+    if found_items:
+        for item in found_items:
+            st.warning(
+                f"Word: '{item['word']}' | "
+                f"Possible confusing character(s): {', '.join(item['chars'])} | "
+                f"OCR confidence: {item['conf']}"
+            )
     else:
-        st.info("No characters available for analysis.")
-
-    # Threshold
-    threshold = st.slider("Set threshold", 0.0, 1.0, 0.20, 0.01)
-
-    st.markdown("### Confusion Detection Result")
-
-    found_confusion = False
-
-    for char in chars:
-        if char in confusion_pairs:
-            found_confusion = True
-
-            # simple simulated confidence for presentation/demo logic
-            top1_prob = 0.55
-            top2_prob = 0.45
-            gap = top1_prob - top2_prob
-
-            st.write(f"Character: {char}")
-            st.write(f"Top 1: {char} ({top1_prob:.2f})")
-            st.write(f"Top 2: {confusion_pairs[char][0]} ({top2_prob:.2f})")
-            st.write(f"Gap: {gap:.2f}")
-
-            if gap < threshold:
-                st.warning(f"Potential confusion detected: {char} ↔ {confusion_pairs[char][0]}")
-            else:
-                st.success(f"Clear prediction: {char}")
-
-    if not found_confusion:
-        st.success("No predefined confusing characters were detected in the extracted text.")
+        st.success("No predefined confusing characters were detected.")
 
 else:
     st.info("Please upload an image.")
+
+
