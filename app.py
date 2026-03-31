@@ -1,18 +1,22 @@
 import streamlit as st
 from PIL import Image
-import random
+import pytesseract
 
-st.set_page_config(page_title="Character Confusion Demo", layout="centered")
+st.set_page_config(page_title="Handwritten Character Confusion Detection", layout="centered")
 
 st.title("Handwritten Character Confusion Detection")
-st.caption("Upload image → prediction → gap → threshold highlight")
+st.caption("Upload handwritten image → OCR → character analysis → confusion detection")
 
-def fake_model_prediction():
-    classes = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
-    probs = [random.random() for _ in classes]
-    total = sum(probs)
-    probs = [p / total for p in probs]
-    return dict(zip(classes, probs))
+# Tesseract path for your Mac
+pytesseract.pytesseract.tesseract_cmd = "/opt/homebrew/bin/tesseract"
+
+# Confusion pairs
+confusion_pairs = {
+    "5": ["S", "s"],
+    "2": ["Z", "z"],
+    "1": ["I", "l"],
+    "0": ["O", "o"]
+}
 
 uploaded_file = st.file_uploader(
     "Upload a handwritten image",
@@ -21,26 +25,56 @@ uploaded_file = st.file_uploader(
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
-    st.image(image, caption="Uploaded Image", width=250)
+
+    st.image(image, caption="Uploaded Image", width=300)
     st.write(f"Image size: {image.size}")
 
-    prediction = fake_model_prediction()
-    sorted_pred = sorted(prediction.items(), key=lambda x: x[1], reverse=True)
+    # OCR
+    text = pytesseract.image_to_string(image)
 
-    top1 = sorted_pred[0]
-    top2 = sorted_pred[1]
-    gap = top1[1] - top2[1]
+    st.markdown("### OCR Extracted Text")
+    if text.strip():
+        st.text(text)
+    else:
+        st.warning("No text was extracted from the image.")
 
-    st.markdown("### Prediction Result")
-    st.write(f"Top 1: {top1[0]} ({top1[1]:.2f})")
-    st.write(f"Top 2: {top2[0]} ({top2[1]:.2f})")
-    st.write(f"Gap: {gap:.2f}")
+    # Character analysis
+    chars = list(text.replace(" ", "").replace("\n", ""))
 
+    st.markdown("### Character Analysis")
+    if chars:
+        st.write(chars)
+    else:
+        st.info("No characters available for analysis.")
+
+    # Threshold
     threshold = st.slider("Set threshold", 0.0, 1.0, 0.20, 0.01)
 
-    if gap < threshold:
-        st.warning(f"Potential confusion detected: {top1[0]} ↔ {top2[0]}")
-    else:
-        st.success(f"Clear prediction: {top1[0]}")
+    st.markdown("### Confusion Detection Result")
+
+    found_confusion = False
+
+    for char in chars:
+        if char in confusion_pairs:
+            found_confusion = True
+
+            # simple simulated confidence for presentation/demo logic
+            top1_prob = 0.55
+            top2_prob = 0.45
+            gap = top1_prob - top2_prob
+
+            st.write(f"Character: {char}")
+            st.write(f"Top 1: {char} ({top1_prob:.2f})")
+            st.write(f"Top 2: {confusion_pairs[char][0]} ({top2_prob:.2f})")
+            st.write(f"Gap: {gap:.2f}")
+
+            if gap < threshold:
+                st.warning(f"Potential confusion detected: {char} ↔ {confusion_pairs[char][0]}")
+            else:
+                st.success(f"Clear prediction: {char}")
+
+    if not found_confusion:
+        st.success("No predefined confusing characters were detected in the extracted text.")
+
 else:
     st.info("Please upload an image.")
