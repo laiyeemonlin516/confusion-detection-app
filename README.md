@@ -3,38 +3,41 @@
 ## Project Goal
 This project aims to detect potentially confusing handwritten characters from handwritten images.
 
-## Current Pipeline
-1. Upload handwritten image
-2. Extract text using OCR
-3. Analyze characters one by one
-4. Detect potentially confusing character pairs
-5. Display warning results
-
-## Streamlit App
-The current Streamlit app supports:
-- image upload
+## Current Application
+The current application supports:
+- handwritten image upload
 - OCR-based text extraction
-- character analysis
-- confusion detection
-- threshold-based warning display
+- OCR bounding box extraction
+- detection of suspicious characters
+highlighting suspicious regions on the original image
+- warning message display
 
-## Confusion Pairs
-The current prototype checks character pairs such as:
-- 5 ↔ S
-- 2 ↔ Z
-- 1 ↔ I / l
+## Current Pipeline
+image upload
+→ OCR
+→ suspicious character detection
+→ image highlight
+→ warning output
+
+## Confusion Character Rules
+The current version checks predefined confusing characters such as:
 - 0 ↔ O / o
+- 1 ↔ I / l
+- 2 ↔ Z / z
+- 5 ↔ S / s
 
-## Current Limitation
-The OCR stage is real, but the probability values for confusion detection are currently simulated for demonstration.
+## Current Status
+The application currently implements OCR-based real detection and visualization.
+The next step is to connect teammate classifiers (n_h, 2_z) for real probability and gap-based confusion detection.
 
 ## Future Work
-- connect real model prediction probabilities
-- improve OCR accuracy
-- detect all confusing characters directly from handwritten images
-- integrate full model pipeline into the app
+- connect crop_metadata and pair_model routing
+- connect real classifier probability outputs
+- calculate gap using classifier outputs
+- apply threshold-based final confusion judgment
 
 ## Run
 ```bash
 streamlit run app.py
+
 
